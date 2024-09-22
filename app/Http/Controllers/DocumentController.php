@@ -50,42 +50,43 @@ class DocumentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'files' => 'required|array',
-            'files.*' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
+            'files.*' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png,txt|max:2048',
         ]);
-
+    
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator);
         }
-
+    
         $uploadedDocuments = [];
         $uploadErrors = [];
-
+    
         foreach ($request->file('files') as $file) {
             try {
-                Storage::disk('public')->putFile('documents', $file);
-
+                $path = Storage::disk('public')->putFile('documents', $file);
+    
                 $document = new Document([
                     'name' => $file->getClientOriginalName(),
-                    'path' => 'documents/' . $file->hashName(),
+                    'path' => $path,
                     'type' => $file->getClientMimeType(),
                     'owner_id' => auth()->id(),
                     'status' => 'processing',
                 ]);
-
+    
                 $document->save();
-
-                // Dispatch job
-                ProcessDocument::dispatch($document);
-
-
-
+    
+                // Read the file content
+                $content = Storage::disk('public')->get($path);
+    
+                // Update the document with its content
+                $document->update(['content' => $content]);
+    
                 $uploadedDocuments[] = $document;
             } catch (\Exception $e) {
                 Log::error('Document upload failed: ' . $e->getMessage());
                 $uploadErrors[] = "Failed to upload {$file->getClientOriginalName()}: {$e->getMessage()}";
             }
         }
-
+    
         if (count($uploadedDocuments) > 0) {
             $message = count($uploadedDocuments) . ' document(s) uploaded successfully.';
             if (count($uploadErrors) > 0) {

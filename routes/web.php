@@ -7,6 +7,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\IntegrationsController;
 
 
 
@@ -57,8 +58,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::post('/process-image', [ImageProcessingController::class, 'processImage'])->name('process-image');
 
-
-
+    Route::get('/integrations', [IntegrationsController::class, 'index'])->name('integrations.index');
+    Route::post('/integrations/github', [IntegrationsController::class, 'integrateGitHub'])->name('integrations.github');
 });
 
 require __DIR__.'/auth.php';
@@ -66,14 +67,3 @@ require __DIR__.'/auth.php';
 Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
 
 
-Route::get('/test-file-contents', function () {
-    $filePath = 'documents/C1pKslb8XHqEjeS88ldDzrBQoTlgq1kyuZgmgAGf.pdf';
-    $fullPath = storage_path('app/public/' . $filePath);
-    
-    if (file_exists($fullPath)) {
-        $contents = file_get_contents($fullPath);
-        return response($contents)->header('Content-Type', 'application/pdf');
-    } else {
-        return response('File not found', 404);
-    }
-})->name('test.file.contents');

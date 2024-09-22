@@ -22,6 +22,9 @@ return new class extends Migration
             $table->json('dates')->nullable();
             $table->json('actionable_data')->nullable();
             $table->json('analysis_data')->nullable();
+            $table->boolean('is_global')->default(false);
+            $table->json('vectorID')->nullable();
+            $table->text('content')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });

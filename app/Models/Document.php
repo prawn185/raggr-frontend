@@ -22,6 +22,9 @@ class Document extends Model
         'tags',
         'category',
         'version',
+        'is_global',
+        'vectorID',
+        'content',
     ];
 
     public function owner()

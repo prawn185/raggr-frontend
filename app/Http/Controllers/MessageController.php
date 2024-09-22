@@ -21,27 +21,12 @@ class MessageController extends Controller
             'content' => 'required|string',
         ]);
 
-        // Store user message
-        $userMessage = $chat->messages()->create([
-            'content' => $request->content,
-            'is_user' => true,
-        ]);
-
-        // Send request to your API
-        $response = Http::withHeaders([
-            'x-api-key' => config('services.llm_api.key'),
-        ])->post(config('services.llm_api.url') . 'chat', [
-            'query' => $request->content,
-            'user_id' => auth()->id(),
-        ]);
+        $userMessage = $this->storeUserMessage($chat, $request->content);
+        $chatHistory = $this->getChatHistory($chat);
+        $response = $this->sendApiRequest($request->content, $chatHistory);
 
         if ($response->successful()) {
-            // Store API response
-            $aiMessage = $chat->messages()->create([
-                'content' => $response->json('response'),
-                'is_user' => false,
-            ]);
-
+            $aiMessage = $this->storeAiMessage($chat, $response);
             return response()->json([
                 'userMessage' => $userMessage,
                 'aiMessage' => $aiMessage,
@@ -65,32 +50,63 @@ class MessageController extends Controller
             'message' => 'required|string',
         ]);
 
-        // Store user message
-        $chat->messages()->create([
-            'content' => $request->message,
-            'is_user' => true,
-        ]);
-
-        // Send request to your API
-        $response = Http::post('http://127.0.0.1:8000/api/chat', [
-            'query' => $request->message,
-            'user_id' => auth()->id(),
-        ]);
+        $this->storeUserMessage($chat, $request->message);
+        $chatHistory = $this->getChatHistory($chat);
+        $response = $this->sendApiRequest($request->message, $chatHistory);
 
         if ($response->successful()) {
-            // Store API response
-            $chat->messages()->create([
-                'content' => $response->json('response'),
-                'is_user' => false,
-            ]);
-
+            $this->storeAiMessage($chat, $response, 'response');
             return response()->json([
                 'message' => $response->json('response'),
+                'source_documents' => $response->json('source_documents'),
             ]);
         }
 
         return response()->json([
             'error' => 'Failed to get response from API',
         ], 500);
+    }
+
+    private function storeUserMessage(Chat $chat, string $content)
+    {
+        return $chat->messages()->create([
+            'content' => $content,
+            'is_user' => true,
+        ]);
+    }
+
+    private function storeAiMessage(Chat $chat, $response, $key = 'answer')
+    {
+        return $chat->messages()->create([
+            'content' => $response->json($key),
+            'is_user' => false,
+            'source_documents' => json_encode($response->json('source_documents')),
+        ]);
+    }
+
+    private function getChatHistory(Chat $chat)
+    {
+        return $chat->messages()
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($message) {
+                return [
+                    $message->is_user ? 'Human' : 'AI' => $message->content,
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    private function sendApiRequest(string $content, array $chatHistory)
+    {
+        return Http::withHeaders([
+            'X-API-Key' => config('services.llm_api.key'),
+            'Content-Type' => 'application/json',
+        ])->post(config('services.llm_api.url') . 'chat', [
+            'query' => $content,
+            'user_id' => auth()->id(),
+            'chat_history' => $chatHistory,
+        ]);
     }
 }
