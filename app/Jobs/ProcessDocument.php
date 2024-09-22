@@ -30,31 +30,19 @@ class ProcessDocument implements ShouldQueue
         Log::info('ProcessDocument job started for document: ' . $this->document->id);
         
         try {
-            $this->processFile($this->document);
+            $response = $this->processFile($this->document);
+            $result = $response->json();
 
-            if ($this->document->type === 'application/pdf') {
-                $response = $this->getDocumentData($this->document, 'process-pdf');
-            } elseif (in_array($this->document->type, ['image/jpeg', 'image/png', 'image/gif'])) {
-                $response = $this->getDocumentData($this->document, 'process-image');
-            } else {
-                throw new \Exception("Unsupported file type: " . $this->document->type);
-            }
-
-            if ($response->json('analysis')) {
-                $result = $response->json();
-                
+            // Check if the document was successfully uploaded
+            if ($response->successful() && isset($result['vector_id']) && isset($result['document_id'])) {
                 // Update document with processed data
                 $this->document->update([
-                    'description' => $result['analysis']['description'] ?? '',
-                    'tags' => implode(',', $result['analysis']['keywords'] ?? []),
-                    'contact_details' => json_encode($result['analysis']['contact_details'] ?? []),
-                    'dates' => json_encode($result['analysis']['dates'] ?? []),
-                    'actionable_data' => json_encode($result['analysis']['actionable_data'] ?? []),
                     'status' => 'processed',
+                    'vectorID' => $result['vector_id'],
+                    // 'document_id' => $result['document_id'],
                 ]);
                 
                 Log::info('ProcessDocument job completed for document: ' . $this->document->id);
-                
             } else {
                 throw new \Exception("Invalid response from document processing: " . $response->body());
             }
@@ -80,7 +68,8 @@ class ProcessDocument implements ShouldQueue
         ])
         ->attach('file', file_get_contents($fullPath), $document->name)
         ->post(config('services.llm_api.url') . $endpoint, [
-            'user_id' => $document->user_id
+            'user_id' => $document->owner_id,
+            'document_id' => $document->id
         ]);
 
         if (!$response->successful()) {
