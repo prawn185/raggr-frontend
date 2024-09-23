@@ -8,12 +8,25 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Chat');
+
+        try {
+            $startTime = microtime(true);
+            $response = Http::timeout(5)->get(config('services.llm_api.url') . 'health');
+            $llmApiStatus = $response->successful();
+            $endTime = microtime(true);
+        } catch (\Exception $e) {
+            Log::error('Error checking LLM API status: ' . $e->getMessage());
+        }
+
+        return Inertia::render('Chat', [
+            'llm_api_status' => $llmApiStatus ?? false,
+        ]);
     }
 
     public function retrieveChats()

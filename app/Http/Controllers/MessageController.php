@@ -27,6 +27,7 @@ class MessageController extends Controller
 
         if ($response->successful()) {
             $aiMessage = $this->storeAiMessage($chat, $response);
+            $aiMessage->update(['latency' => $response->json('latency')]);
             return response()->json([
                 'userMessage' => $userMessage,
                 'aiMessage' => $aiMessage,
@@ -50,12 +51,13 @@ class MessageController extends Controller
             'message' => 'required|string',
         ]);
 
-        $this->storeUserMessage($chat, $request->message);
+        $userMessage = $this->storeUserMessage($chat, $request->message);
         $chatHistory = $this->getChatHistory($chat);
         $response = $this->sendApiRequest($request->message, $chatHistory);
 
         if ($response->successful()) {
-            $this->storeAiMessage($chat, $response, 'response');
+            $aiMessage = $this->storeAiMessage($chat, $response, 'response');
+            $aiMessage->update(['latency' => $response->json('latency')]);
             return response()->json([
                 'message' => $response->json('response'),
                 'source_documents' => $response->json('source_documents'),

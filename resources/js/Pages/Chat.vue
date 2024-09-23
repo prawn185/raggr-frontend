@@ -5,9 +5,11 @@
         <div class="flex h-[calc(100vh-64px)] overflow-hidden">
             <!-- Sidebar -->
             <div class="bg-gray-800 text-white p-4 flex flex-col w-1/6 overflow-hidden">
-                <button @click="createNewChat" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded mb-4 shadow-md">
-                    New Chat
-                </button>
+                <div class="flex justify-between items-center mb-4">
+                    <button @click="createNewChat" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded shadow-md flex-grow mr-2">
+                        New Chat
+                    </button>
+                </div>
                 <hr class="border-gray-600">
                 <div class="overflow-y-auto flex-grow mt-3">
                     <div v-for="chat in chats" :key="chat.id" 
@@ -19,6 +21,17 @@
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                             </svg>
                         </button>
+                    </div>
+                </div>
+                <hr class="border-gray-600 ">
+                <div class="flex flex-col mt-3">
+                    <div class="flex items-center justify-between">
+                        <span class="mr-2 text-xs">API Status:</span>
+                        <div class="flex items-center border-1">
+                            <span class="ml-2 text-xs">{{ llm_api_status ? 'Online' : 'Offline' }}</span>
+                            <div :class="['w-2 h-2 rounded-full ml-2', llm_api_status ? 'bg-green-500' : 'bg-red-500']"></div>
+                            <span class="ml-2 text-xs" v-if="avg_response_time">{{ avg_response_time }} ms</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -58,17 +71,26 @@
                                         <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
                                     </svg>
                                 </button>
-                                <div v-if="message.showDropdown" class="absolute right-0 w-64 mt-2 bg-white rounded-md shadow-lg z-10">
-                                    <div class="py-2">
-                                        <div v-for="document in JSON.parse(message.source_documents)" :key="document.id" class="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100">
-                                            <span class="text-blue-500 font-medium">{{ document.metadata.source }}</span>
+                                <div v-if="message.showDropdown" class="absolute right-0 mt-2 bg-white rounded-md shadow-lg z-10 break-words" :style="{ width: 'max-content', minWidth: '16rem', maxWidth: '24rem' }">
+                                    <div class="py-1">
+                                        <div v-for="(document, index) in JSON.parse(message.source_documents)" :key="index">
+                                            <span v-if="index === 0 " class="text-blue-500 font-medium">
+                                                <div class="px-3 py-1 text-sm text-gray-700 hover:bg-gray-100">
+                                                {{ document.replace('temp/', '') }}
+                                            </div>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div v-if="isAiTyping" class="mb-4 text-gray-500 italic">
-                            AI is writing...
+                        <div v-if="isAiTyping" class="mb-4 p-3 rounded-lg bg-gray-800 ">
+                            <div class="flex-grow">
+                                <div class="font-semibold mb-1">AI</div>
+                                <div class="h-4 bg-gray-700 rounded w-3/4 mb-2 animate-pulse"></div>
+                                <div class="h-4 bg-gray-700 rounded w-1/2 animate-pulse"></div>
+                            </div>
+
                         </div>
                     </div>
                     <div class="p-4 border-t">
@@ -98,6 +120,11 @@ import { Head } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import axios from 'axios';
 
+// Accept props from the server
+const props = defineProps({
+    llm_api_status: Boolean,
+});
+
 const chats = ref([]);
 const selectedChat = ref(null);
 const messages = ref([]);
@@ -109,6 +136,10 @@ const editedTitle = ref('');
 const titleInput = ref(null);
 
 const messageInput = ref(null);
+
+// Use the props directly
+const llm_api_status = ref(props.llm_api_status);
+const avg_response_time = ref(props.avg_response_time);
 
 const createNewChat = async () => {
     try {
